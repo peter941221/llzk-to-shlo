@@ -28,6 +28,7 @@ limitations under the License.
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/SymbolTable.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::llzk_to_shlo {
@@ -83,22 +84,17 @@ bool isPodMemberType(Type ty) {
   return isa<llzk::pod::PodType>(ty);
 }
 
-// Look up a `struct.def` by its leaf symbol name. LLZK v2 nests
-// `struct.def`s inside per-component `builtin.module` / `poly.template`
-// wrappers, but leaf names are unique across a chip module (the
-// `--stabilize` pass guarantees this), so a flat walk suffices. Mirrors
-// the lookup in `SimplifySubComponents.cpp::findInnerFeltMembers`.
-llzk::component::StructDefOp findStructDefByLeafName(ModuleOp module,
-                                                     StringRef leaf) {
-  llzk::component::StructDefOp result;
-  module.walk([&](llzk::component::StructDefOp op) {
-    if (op.getSymName() == leaf) {
-      result = op;
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  return result;
+llzk::component::StructDefOp findStructDefByExactSymbol(
+    ModuleOp module, llzk::component::StructType structTy) {
+  if (!module || !structTy)
+    return {};
+  if (auto def = dyn_cast_or_null<llzk::component::StructDefOp>(
+          SymbolTable::lookupSymbolIn(module, structTy.getNameRef()))) {
+    return def;
+  }
+  return dyn_cast_or_null<llzk::component::StructDefOp>(
+      SymbolTable::lookupSymbolIn(module,
+                                  structTy.getNameRef().getLeafReference()));
 }
 
 int64_t getMemberFlatSizeImpl(Type memberType, ModuleOp module,
@@ -149,8 +145,7 @@ int64_t getMemberFlatSizeImpl(Type memberType, ModuleOp module,
     auto sty = dyn_cast<llzk::component::StructType>(memberType);
     if (!sty || !module)
       return 1;
-    StringRef leaf = sty.getNameRef().getLeafReference().getValue();
-    if (auto def = findStructDefByLeafName(module, leaf))
+    if (auto def = findStructDefByExactSymbol(module, sty))
       return getStructFlatSize(def, module, visited);
     return 1;
   }

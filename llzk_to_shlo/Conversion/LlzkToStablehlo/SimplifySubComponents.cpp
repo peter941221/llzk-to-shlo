@@ -219,6 +219,19 @@ ModuleOp getTopLevelModule(Block &funcBlock) {
   return moduleOp;
 }
 
+llzk::component::StructDefOp findStructDefByExactSymbol(
+    ModuleOp module, llzk::component::StructType structTy) {
+  if (!module || !structTy)
+    return {};
+  if (auto def = dyn_cast_or_null<llzk::component::StructDefOp>(
+          SymbolTable::lookupSymbolIn(module, structTy.getNameRef()))) {
+    return def;
+  }
+  return dyn_cast_or_null<llzk::component::StructDefOp>(
+      SymbolTable::lookupSymbolIn(module,
+                                  structTy.getNameRef().getLeafReference()));
+}
+
 /// Build `array<destDims + innerDims x leafFelt>` when `innerFeltTy` is a
 /// felt array (`!array<K x !felt>`), or `array<destDims x innerFeltTy>` when
 /// it is a scalar `!felt`. Used by writers + readers materializing a

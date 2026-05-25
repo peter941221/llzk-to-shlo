@@ -20,9 +20,11 @@ limitations under the License.
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llzk/Dialect/Array/IR/Types.h"
+#include "llzk/Dialect/Struct/IR/Ops.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Value.h"
 
 namespace mlir::llzk_to_shlo {
@@ -54,6 +56,11 @@ namespace mlir::llzk_to_shlo {
 /// top-level module (LLZK v2's `createEmptyTemplateRemoval` wraps each
 /// component in its own `builtin.module`).
 ModuleOp getTopLevelModule(Block &funcBlock);
+
+/// Resolve a struct type's defining `struct.def` by exact SymbolRefAttr match.
+/// Falls back to the leaf symbol only when the type carries no nested scope.
+llzk::component::StructDefOp findStructDefByExactSymbol(
+    ModuleOp module, llzk::component::StructType structTy);
 
 /// Build `array<destDims + innerDims x leafFelt>` when `innerFeltTy` is a felt
 /// array, or `array<destDims x innerFeltTy>` when it is a scalar `!felt`.

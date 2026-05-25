@@ -216,33 +216,6 @@ struct PacfDrainPlan {
 // comparison in the single-instance fold (see fold site for rationale).
 constexpr unsigned kIndexBitWidth = 64;
 
-// Locate the `struct.def` for `structTy` by walking the enclosing module
-// for a `StructDefOp` whose `sym_name` matches the leaf symbol name. AES
-// sub-component structs have unique leaf names (`@XOR_0`, `@Bits2Num_1`, …)
-// so leaf matching is sufficient — no need to track the enclosing
-// `poly.template` / `builtin.module` chain that LLZK v2 wraps around each
-// component. Yields the enclosing module via `moduleOut`; returns the def
-// (or nullptr).
-static Operation *findStructDefByLeaf(Block &funcBlock,
-                                      llzk::component::StructType structTy,
-                                      ModuleOp &moduleOut) {
-  moduleOut = getTopLevelModule(funcBlock);
-  if (!moduleOut)
-    return nullptr;
-  StringRef leaf = structTy.getNameRef().getLeafReference().getValue();
-  Operation *foundDef = nullptr;
-  moduleOut->walk([&](Operation *op) {
-    if (!isa<llzk::component::StructDefOp>(op))
-      return WalkResult::advance();
-    auto sym = op->getAttrOfType<StringAttr>("sym_name");
-    if (!sym || sym.getValue() != leaf)
-      return WalkResult::advance();
-    foundDef = op;
-    return WalkResult::interrupt();
-  });
-  return foundDef;
-}
-
 // Populates `out` with the pub felt members of `structTy` in declaration
 // order when its struct.def has at least one `{llzk.pub}` member whose type
 // is `!felt` or `!array<... x !felt>`. When K>1, all members must share the
@@ -251,8 +224,11 @@ static bool findInnerFeltMembers(Block &funcBlock,
                                  llzk::component::StructType structTy,
                                  SmallVectorImpl<PacfPubFelt> &out) {
   out.clear();
-  ModuleOp moduleOp;
-  Operation *foundDef = findStructDefByLeaf(funcBlock, structTy, moduleOp);
+  ModuleOp moduleOp = getTopLevelModule(funcBlock);
+  if (!moduleOp)
+    return false;
+  llzk::component::StructDefOp foundDef =
+      findStructDefByExactSymbol(moduleOp, structTy);
   if (!foundDef)
     return false;
   // Public is the canonical "this is the witness output" marker —
@@ -315,8 +291,11 @@ static bool collectAndPromoteRecursiveWritemMembers(
     Block &funcBlock, llzk::component::StructType structTy,
     SmallVectorImpl<PacfWritemMember> &out, bool promote) {
   out.clear();
-  ModuleOp moduleOp;
-  Operation *foundDef = findStructDefByLeaf(funcBlock, structTy, moduleOp);
+  ModuleOp moduleOp = getTopLevelModule(funcBlock);
+  if (!moduleOp)
+    return false;
+  llzk::component::StructDefOp foundDef =
+      findStructDefByExactSymbol(moduleOp, structTy);
   if (!foundDef)
     return false;
   llvm::DenseSet<StringAttr> writemSet = collectWritemTargets(foundDef);
