@@ -15,6 +15,8 @@ limitations under the License.
 
 #include "llzk_to_shlo/Conversion/LlzkToStablehlo/SimplifySubComponents.h"
 
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringSet.h"
@@ -149,6 +151,30 @@ static bool isSafeToCloneBefore(Operation *def) {
              llzk::array::ArrayLengthOp, llzk::pod::ReadPodOp>(def);
 }
 
+static bool canCloneDefiningOpBeforeImpl(Value v, Operation &guardOp,
+                                         llvm::DenseSet<Value> &visiting,
+                                         unsigned depth) {
+  if (!isValueDefinedInside(v, guardOp))
+    return true;
+  if (depth == 0)
+    return false;
+  if (!visiting.insert(v).second)
+    return true;
+
+  auto eraseOnExit = llvm::make_scope_exit([&] { visiting.erase(v); });
+
+  Operation *def = v.getDefiningOp();
+  if (!def)
+    return false; // block-argument inside guardOp — not clonable
+  if (!isSafeToCloneBefore(def))
+    return false;
+  for (Value operand : def->getOperands()) {
+    if (!canCloneDefiningOpBeforeImpl(operand, guardOp, visiting, depth - 1))
+      return false;
+  }
+  return true;
+}
+
 /// Recursively clone the defining-op chain of `v` BEFORE `insertBefore` so
 /// the clone's result dominates `insertBefore`. Returns the cloned value,
 /// or a null `Value()` on failure (chain reaches a block argument inside
@@ -202,6 +228,11 @@ Value cloneDefiningOpBefore(Value v, Operation *insertBefore,
   Value result = cloned->getResult(resultIdx);
   cloneCache[v] = result;
   return result;
+}
+
+bool canCloneDefiningOpBefore(Value v, Operation &guardOp, unsigned depth) {
+  llvm::DenseSet<Value> visiting;
+  return canCloneDefiningOpBeforeImpl(v, guardOp, visiting, depth);
 }
 
 /// Walk up from `funcBlock` past any nested `builtin.module` wrappers to

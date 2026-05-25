@@ -73,6 +73,11 @@ Value cloneDefiningOpBefore(Value v, Operation *insertBefore,
                             llvm::DenseMap<Value, Value> &cloneCache,
                             unsigned depth = 8);
 
+/// True iff `cloneDefiningOpBefore` would be able to clone `v` out of
+/// `guardOp` using the same safety rules and recursion depth.
+bool canCloneDefiningOpBefore(Value v, Operation &guardOp,
+                              unsigned depth = 8);
+
 /// Create an llzk.nondet operation producing an uninitialized value.
 Value createNondet(OpBuilder &builder, Location loc, Type type);
 
