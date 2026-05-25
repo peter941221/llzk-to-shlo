@@ -92,6 +92,8 @@ llzk::component::StructDefOp findStructDefByExactSymbol(
           SymbolTable::lookupSymbolIn(module, structTy.getNameRef()))) {
     return def;
   }
+  if (!structTy.getNameRef().getNestedReferences().empty())
+    return {};
   return dyn_cast_or_null<llzk::component::StructDefOp>(
       SymbolTable::lookupSymbolIn(module,
                                   structTy.getNameRef().getLeafReference()));
