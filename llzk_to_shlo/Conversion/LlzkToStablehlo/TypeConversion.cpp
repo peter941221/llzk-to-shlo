@@ -84,8 +84,9 @@ bool isPodMemberType(Type ty) {
   return isa<llzk::pod::PodType>(ty);
 }
 
-llzk::component::StructDefOp findStructDefByExactSymbol(
-    ModuleOp module, llzk::component::StructType structTy) {
+llzk::component::StructDefOp
+findStructDefByExactSymbol(ModuleOp module,
+                           llzk::component::StructType structTy) {
   if (!module || !structTy)
     return {};
   if (auto def = dyn_cast_or_null<llzk::component::StructDefOp>(

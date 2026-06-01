@@ -59,8 +59,9 @@ ModuleOp getTopLevelModule(Block &funcBlock);
 
 /// Resolve a struct type's defining `struct.def` by exact SymbolRefAttr match.
 /// Falls back to the leaf symbol only when the type carries no nested scope.
-llzk::component::StructDefOp findStructDefByExactSymbol(
-    ModuleOp module, llzk::component::StructType structTy);
+llzk::component::StructDefOp
+findStructDefByExactSymbol(ModuleOp module,
+                           llzk::component::StructType structTy);
 
 /// Build `array<destDims + innerDims x leafFelt>` when `innerFeltTy` is a felt
 /// array, or `array<destDims x innerFeltTy>` when it is a scalar `!felt`.
